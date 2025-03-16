@@ -2,91 +2,90 @@
 const Tour = require("../models/tourModel.js");
 const APIFeatures = require("../utils/apiFeatures.js");
 
-// zorluğa göre istatistikleri hesapla
+// getTourStats: Zorluk seviyesine göre tur istatistiklerini hesapla
 exports.getTourStats = async (req, res, next) => {
-  // Aggregation Pipeline
-  // Raporlama Adımları
+  // MongoDB Aggregation Pipeline ile istatistikleri hesapla
   const stats = await Tour.aggregate([
-    // 1.Adım ) ratingi 4 ve üzeri olan turları al
+    // 1. Adım: Yalnızca 4.0 ve üzeri puana sahip turları filtrele
     {
       $match: { ratingsAverage: { $gte: 4.0 } },
     },
-    // 2.Adım ) zorluklarına göre gruplandır ve ortalam değerlerini hesapla
+    // 2. Adım: Turları zorluk seviyesine göre grupla ve istatistikleri hesapla
     {
       $group: {
-        _id: "$difficulty",
-        count: { $sum: 1 },
-        avgRating: { $avg: "$ratingsAverage" },
-        avgPrice: { $avg: "$price" },
-        minPrice: { $min: "$price" },
-        maxPrice: { $max: "$price" },
+        _id: "$difficulty", // Zorluk seviyesine göre grupla
+        count: { $sum: 1 }, // Her grupta kaç tur olduğunu say
+        avgRating: { $avg: "$ratingsAverage" }, // Ortalama puanı hesapla
+        avgPrice: { $avg: "$price" }, // Ortalama fiyatı hesapla
+        minPrice: { $min: "$price" }, // En düşük fiyatı al
+        maxPrice: { $max: "$price" }, // En yüksek fiyatı al
       },
     },
-    // 3.Adım ) gruplanan veriyi fiyata göre artan sırala
+    // 3. Adım: Ortalama fiyata göre artan sırala
     { $sort: { avgPrice: 1 } },
-    // 4.Adım ) fiyatı 400den küçük olan zorlukları kaldır
+    // 4. Adım: Ortalama fiyatı 500'den küçük olanları kaldır
     { $match: { avgPrice: { $gte: 500 } } },
   ]);
 
+  // JSON yanıtı dön
   res.status(200).json({
     message: "Rapor oluşturuldu",
-    stats,
+    stats, // Hesaplanan istatistikleri döndür
   });
 };
 
-// yıla göre istastikleri hesapla
+// getMonthlyPlan: Yıla göre aylık tur istatistiklerini hesapla
 exports.getMonthlyPlan = async (req, res, next) => {
-  // parametre olarak gelen yılı al
+  // URL parametresinden yılı al ve Number formatına çevir
   const year = Number(req.params.year);
 
-  // raporlama adımları
+  // MongoDB Aggregation Pipeline ile istatistikleri hesapla
   const stats = await Tour.aggregate([
+    // 1. Adım: startDates dizisini açarak her tarihi ayrı bir belge haline getir
     {
       $unwind: {
         path: "$startDates",
       },
     },
+    // 2. Adım: Yalnızca belirtilen yıl içinde gerçekleşen turları seç
     {
       $match: {
         startDates: {
-          $gte: new Date(`${year}-01-01`),
-          $lte: new Date(`${year}-12-31`),
+          $gte: new Date(`${year}-01-01`), // Yılın başından itibaren
+          $lte: new Date(`${year}-12-31`), // Yılın sonuna kadar olanları filtrele
         },
       },
     },
+    // 3. Adım: Turları aylara göre grupla ve istatistikleri hesapla
     {
       $group: {
-        _id: {
-          $month: "$startDates",
-        },
-        count: {
-          $sum: 1,
-        },
-        tours: {
-          $push: "$name",
-        },
+        _id: { $month: "$startDates" }, // Ay bazında grupla
+        count: { $sum: 1 }, // Her ay kaç tur olduğunu hesapla
+        tours: { $push: "$name" }, // O ay yapılan turları listele
       },
     },
+    // 4. Adım: Yeni bir alan ekleyerek ay bilgisini düzenle
     {
       $addFields: {
-        month: "$_id",
+        month: "$_id", // "_id" yerine "month" alanı ekle
       },
     },
+    // 5. Adım: "_id" alanını kaldırarak gereksiz veriyi temizle
     {
       $project: {
         _id: 0,
       },
     },
+    // 6. Adım: Aylara göre artan sıralama yap
     {
-      $sort: {
-        month: 1,
-      },
+      $sort: { month: 1 },
     },
   ]);
 
+  // JSON yanıtı dön
   res.status(200).json({
     message: `${year} yılı için aylık plan oluşturuldu`,
-    stats,
+    stats, // Hesaplanan istatistikleri döndür
   });
 };
 
