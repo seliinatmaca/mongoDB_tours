@@ -7,12 +7,26 @@ const {
   updateTour,
   deleteTour,
   getTour,
+  aliasTopTours,
+  getTourStats,
+  getMonthlyPlan,
 } = require("../controllers/tourController.js");
 const formatOuery = require("../middleware/formatOuery.js");
 
 const router = express.Router();
 
 // ------------ yollar -------------
+
+// client zaten /api/tours'a doğru parametrelerle istek atarsa aynı sonucu alıcak ama param sayısı fazla olduğundan bazı durumlarda parametrleri client'tan istemek yerine önden bizim belirledğimiz route'lar oluşturmak client'ın işiini kolaylaştırır
+router.route("/api/top-tours").get(aliasTopTours, getAllTours);
+
+// turların istatistiklerinin alınması için route
+// gerçek seneryo: admin paneli için zorluğa göre turların istatisklerini hesapla
+router.route("/api/tour-stats").get(getTourStats);
+
+// gerçek seneryo: admin paneli için parametre olarak gelen yılın he rayında kaç tur başlayacak hesapla.
+router.route("/api/monthly-plan/:year").get(getMonthlyPlan);
+
 router.route("/api/tours").get(formatOuery, getAllTours).post(createTour);
 
 router
